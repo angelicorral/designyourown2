@@ -1,0 +1,148 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * This module creates implements the communication between the actual product designer and drupal ubercart
+ *
+ */
+ 
+ require_once ('./includes/database.inc');
+ 
+ /*DEFINE CONSTANTS BASED ON HOW DRUPAL ATTRIBUTES AND VOCABULARY ARE SETUP*/
+define("SIZES_AID", 3);
+define("COLORS_AID", 1);
+
+
+function productdesigner_form_alter(&$form, &$form_state, $form_id){
+		if(strpos($form_id, 'add_to_cart_form') > 0 && !drupal_is_front_page()) 
+		{
+			$form['submit']['#submit'] = array('productdesigner_add_to_cart_submit');	
+		}
+		
+		if ($form_id == 'uc_cart_view_form') {
+			
+			$i=0;
+			$items = uc_cart_get_contents();
+			
+			foreach($items as $item){
+				$cartitem_id=0;
+				$designorder_id=0;
+				if(array_key_exists('cart_item_id', $item)){
+					 $cartitem_id = $item->cart_item_id;
+					 $designOrder = retrieveDesignOrder_ByCartItem($cartitem_id);
+					 $designorder_id = $designOrder['design_id'];
+				}
+				
+				//if(array_key_exists("image", $item[$i]))
+					 $form['items'][$i]['image']['#value']='<a href="/designyourown2/content/hanes-roundneck-tshirt"><img src="/designyourown2/productdesigner/DESIGNORDERS/'.$designorder_id.'.png" alt="" title="" width="170" height="300" class="imagecache imagecache-cart"/></a>';
+					 $href = "/designyourown2/productdesigner/index.php?did=".$designorder_id."&itemid=".$cartitem_id;
+ 					
+					//get last li element : element for Design ID and change into a hyperlink for EDIT
+					$DOM = new DOMDocument;
+   					$DOM->loadHTML($form['items'][$i]['description']['#value']);
+					$items = $DOM->getElementsByTagName("li");
+					$element =  $items->item(2);
+					$newElement = $DOM->createElement("li");
+					$link = $DOM->createElement("a", "Edit Design");
+					$link->setAttribute("href", $href);
+					$newElement->appendChild($link);
+					$element->parentNode->replaceChild($newElement, $element);
+					
+					$form['items'][$i]['desc']['#value'] = $DOM->saveXML();					 
+   
+				$i++;
+			}
+		}
+		
+    
+    	
+}
+
+function productdesigner_add_to_cart_submit(&$form, &$form_state) {
+	//dsm($form_state);
+    	    
+	$options = 'nid='. $form_state['values']['nid']."&sz=".$form_state['values']['attributes'][SIZES_AID]."&color=".$form_state['values']['attributes'][COLORS_AID];
+	
+	$form_state['redirect'] = array('productdesigner/index.php', $options);
+		
+}
+
+function productdesigner_add_to_cart($nid, $qty, $data){
+	dsm($data);
+}
+
+function productdesigner_cart_item($op, &$item) {
+	switch ($op) {
+	    case 'load':
+						   
+				if(isset($_SESSION['DESIGNRECORD']) && isset($_SESSION['MODE'])){
+					$designrec_id = $_SESSION['DESIGNRECORD'];
+										
+					if(!isExistingDesignCartItem($designrec_id, $item->cart_item_id)){
+						createDesignCartItem($designrec_id, $item->cart_item_id);
+					}
+					
+					
+					$designorder = retrieveDesignOrder($designrec_id);
+					$item->price = $designorder['price'];
+					
+					
+				}
+								
+	      break;
+	 }			
+}
+
+function isExistingDesignCartItem($design_id, $cart_item_id){
+	$result = db_query("select * from designcartitem where design_id=%d and cart_item_id=%d", $design_id, $cart_item_id);
+	
+	foreach ($result as $record) {
+		return true;
+	}
+	
+	return false;
+}
+
+
+function createDesignCartItem($design_id, $cart_item_id){
+	$result = db_query('insert into designcartitem (cart_item_id, design_id) values (%d, %d)',  $cart_item_id, $design_id);
+	return $result;
+}
+
+
+function isExistingDesignOrder($cartitem_id){
+	$result = db_query("select * from designorder where cart_item_id=%d", $cartitem_id);
+	
+	foreach ($result as $record) {
+		return true;
+	}
+	
+	return false;
+}
+
+function retrieveDesignOrder($design_id){
+	
+	$result = db_query("select * from designorder where id=%d", $design_id);
+	
+	foreach ($result as $record) {
+		return $record;	
+	}
+	
+}
+function retrieveDesignOrder_ByCartItem($cartitem_id){
+	
+	$result = db_query("SELECT * FROM designorder d join designcartitem dc on d.id=dc.design_id where dc.cart_item_id=%d", $cartitem_id);
+	
+	foreach ($result as $record) {
+		return $record;	
+	}
+	
+}
+
+function updateDesignOrder_CartItem($designrecord_id, $cart_item_id){
+	$result = update_sql('update designorder set cart_item_id='.$cart_item_id.' where id='.$designrecord_id);
+	return $result;
+}
+
+

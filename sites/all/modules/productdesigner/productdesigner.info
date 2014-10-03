@@ -1,0 +1,12 @@
+; $Id$
+name = Product Designer
+description = Enables Product Designer Functions to be integrated on Ubercart.
+package = "Productdesigner"
+core = 6.x
+
+; Information added by drupal.org packaging script on 2010-11-27
+version = "6.x-2.1"
+core = "6.x"
+project = "productdesigner"
+datestamp = "1290827765"
+
